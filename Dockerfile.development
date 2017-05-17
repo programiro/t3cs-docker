@@ -1,0 +1,108 @@
+#++++++++++++++++++++++++++++++++++++++
+# PHP application Docker container
+#++++++++++++++++++++++++++++++++++++++
+#
+# PHP-Versions:
+#  ubuntu-12.04 -> PHP 5.3         (precise)  LTS
+#  ubuntu-14.04 -> PHP 5.5         (trusty)   LTS
+#  ubuntu-15.04 -> PHP 5.6         (vivid)
+#  ubuntu-15.10 -> PHP 5.6         (wily)
+#  ubuntu-16.04 -> PHP 7.0         (xenial)   LTS
+#  centos-7     -> PHP 5.4
+#  debian-7     -> PHP 5.4         (wheezy)
+#  debian-8     -> PHP 5.6 and 7.x (jessie)
+#  debian-9     -> PHP 7.0         (stretch)
+#
+# Apache:
+#   webdevops/php-apache-dev:ubuntu-12.04
+#   webdevops/php-apache-dev:ubuntu-14.04
+#   webdevops/php-apache-dev:ubuntu-15.04
+#   webdevops/php-apache-dev:ubuntu-15.10
+#   webdevops/php-apache-dev:ubuntu-16.04
+#   webdevops/php-apache-dev:centos-7
+#   webdevops/php-apache-dev:debian-7
+#   webdevops/php-apache-dev:debian-8
+#   webdevops/php-apache-dev:debian-8-php7
+#   webdevops/php-apache-dev:debian-9
+#
+# Nginx:
+#   webdevops/php-nginx-dev:ubuntu-12.04
+#   webdevops/php-nginx-dev:ubuntu-14.04
+#   webdevops/php-nginx-dev:ubuntu-15.04
+#   webdevops/php-nginx-dev:ubuntu-15.10
+#   webdevops/php-nginx-dev:ubuntu-16.04
+#   webdevops/php-nginx-dev:centos-7
+#   webdevops/php-nginx-dev:debian-7
+#   webdevops/php-nginx-dev:debian-8
+#   webdevops/php-nginx-dev:debian-8-php7
+#   webdevops/php-nginx-dev:debian-9
+#
+# HHVM:
+#   webdevops/hhvm-apache
+#   webdevops/hhvm-nginx
+#
+#++++++++++++++++++++++++++++++++++++++
+
+FROM webdevops/php-apache-dev:ubuntu-16.04
+
+ENV PROVISION_CONTEXT "development"
+
+# Deploy scripts/configurations
+COPY etc/             /opt/docker/etc/
+COPY provision/       /opt/docker/provision/
+
+RUN /opt/docker/bin/provision add --tag bootstrap --tag entrypoint boilerplate-main boilerplate-main-development boilerplate-deployment \
+    && /opt/docker/bin/bootstrap.sh
+
+
+# Configure volume/workdir
+RUN mkdir -p /app && cd $_
+WORKDIR /app
+
+
+#
+# Medienagenten
+# Install missing dependencies
+#
+
+# Install updates, get packages
+RUN apt-get update --fix-missing -y -qq
+RUN sudo apt-get install -y build-essential libssl-dev curl wget software-properties-common ghostscript
+
+# Install ruby, python, etc.
+RUN sudo apt-get install -y python git git-core
+
+RUN git config --global url."https://".insteadOf git://
+
+RUN curl -sL https://deb.nodesource.com/setup_4.x | sudo -E bash -
+RUN sudo apt-get install -y nodejs
+
+# Install npm global packages
+RUN sudo npm install -g bower gulpjs/gulp-cli
+
+# Install nvm
+ENV NVM_DIR /usr/local/nvm
+ENV NODE_VERSION 4
+
+RUN curl -sL https://raw.githubusercontent.com/xtuple/nvm/master/install.sh | sudo -E bash -
+RUN . $NVM_DIR/nvm.sh
+RUN nvm install $NODE_VERSION
+RUN nvm alias default $NODE_VERSION
+RUN nvm use default
+
+ENV NODE_PATH $NVM_DIR/versions/node/v$NODE_VERSION/lib/node_modules
+ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+
+# Bind git dir
+ENV GIT_DIR=/tmp
+
+# Make sure to use the latest version of npm
+RUN sudo npm install -g npm
+
+# install ruby
+RUN sudo apt-add-repository ppa:brightbox/ruby-ng
+RUN sudo apt-get update
+RUN sudo apt-get install -y ruby2.3 ruby2.3-dev
+
+# install compass
+RUN gem install --no-rdoc --no-ri compass
